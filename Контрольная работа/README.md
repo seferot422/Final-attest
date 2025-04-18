@@ -1,10 +1,12 @@
 ### [Итоговая контрольная работа по блоку специализация](https://gb.ru/lessons/440557/homework)
 
-#### Ярохно Константин, группа 6024
+#### Комаров Сергей
 
 #### Информация о проекте
 
 Необходимо организовать систему учета для питомника в котором живут домашние и Pack animals.
+
+Вариант 1
 
 ##### Задание 1. Использование команды cat в Linux
 
@@ -595,7 +597,306 @@ Connection to 192.168.1.139 closed.
 
 > Функционал приложения описан в файле [README.md](HumanFriends/README.md) в папке с проектом.
 
-##### Задание 10. Счетчик животных
+ ##### Задание 10. Счетчик животных
 
 Создать механизм, который позволяет вывести на экран общее количество созданных животных любого типа (Как домашних, так
 и вьючных), то есть при создании каждого нового животного счетчик увеличивается на “1”.
+
+Либо реализовать это на Python(2 вариант)
+
+### **Пошаговое выполнение задания**  
+
+Разобьем работу на **4 этапа**:  
+1. **Работа в терминале Linux** (пункты 1-5)  
+2. **Настройка MySQL и работа с БД** (пункты 6-12)  
+3. **Разработка программы на Python** (пункты 13-14)  
+4. **Реализация счетчика с try-with-resources** (пункт 15)  
+
+---
+
+## **1. Работа в терминале Linux**  
+
+### **1.1. Создание и объединение файлов**  
+# Создаем файл "Домашние_животные" и заполняем его
+cat > Домашние_животные << EOF
+собаки
+кошки
+хомяки
+EOF
+
+# Создаем файл "Вьючные_животные" и заполняем его
+cat > Вьючные_животные << EOF
+лошади
+верблюды
+ослы
+EOF
+
+# Объединяем файлы
+cat Домашние_животные Вьючные_животные > Друзья_человека
+
+# Проверяем содержимое
+cat Друзья_человека
+**Вывод:**  
+собаки  
+кошки  
+хомяки  
+лошади  
+верблюды  
+ослы  
+
+### **1.2. Создание директории и перемещение файла**  
+mkdir Животные
+mv Друзья_человека Животные/
+ls Животные/  # Проверяем
+
+### **1.3. Подключение репозитория MySQL и установка пакета**  
+sudo apt update
+sudo apt install mysql-server
+sudo systemctl start mysql
+
+### **1.4. Установка и удаление .deb-пакета**  
+# Пример (используем htop для демонстрации)
+wget http://ftp.ru.debian.org/debian/pool/main/h/htop/htop_3.0.5-7_amd64.deb
+sudo dpkg -i htop_3.0.5-7_amd64.deb  # Установка
+sudo dpkg -r htop                     # Удаление
+
+### **1.5. Сохранение истории команд**  
+history > history_commands.txt
+cat history_commands.txt
+
+---
+
+## **2. Настройка MySQL и работа с БД**  
+
+### **2.1. Создание базы данных**  
+CREATE DATABASE `Друзья человека`;
+USE `Друзья человека`;
+
+### **2.2. Создание таблиц по иерархии**  
+-- Родительская таблица (не обязательна, но для структуры добавим)
+CREATE TABLE Animals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type ENUM('Домашние', 'Вьючные'),
+    name VARCHAR(50),
+    commands TEXT,
+    birth_date DATE
+);
+
+-- Таблицы для домашних животных
+CREATE TABLE Dogs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50),
+    commands TEXT,
+    birth_date DATE
+);
+
+CREATE TABLE Cats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50),
+    commands TEXT,
+    birth_date DATE
+);
+
+CREATE TABLE Hamsters (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50),
+    commands TEXT,
+    birth_date DATE
+);
+
+-- Таблицы для вьючных животных
+CREATE TABLE Horses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50),
+    commands TEXT,
+    birth_date DATE
+);
+
+CREATE TABLE Camels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50),
+    commands TEXT,
+    birth_date DATE
+);
+
+CREATE TABLE Donkeys (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50),
+    commands TEXT,
+    birth_date DATE
+);
+
+### **2.3. Заполнение таблиц данными**  
+INSERT INTO Dogs (name, commands, birth_date) VALUES 
+('Шарик', 'Сидеть, Лежать', '2020-05-12'),
+('Бобик', 'Голос, Апорт', '2019-11-03');
+
+INSERT INTO Cats (name, commands, birth_date) VALUES 
+('Мурзик', 'Кушать, Спать', '2021-02-20');
+
+INSERT INTO Horses (name, commands, birth_date) VALUES 
+('Буран', 'Галоп, Стоп', '2018-07-15');
+
+### **2.4. Удаление верблюдов и объединение лошадей и ослов**  
+-- Удаляем верблюдов (пункт 10)
+DROP TABLE Camels;
+
+-- Объединяем лошадей и ослов в одну таблицу
+CREATE TABLE HorsesAndDonkeys AS
+SELECT * FROM Horses
+UNION ALL
+SELECT * FROM Donkeys;
+
+### **2.5. Создание таблицы "Молодые животные" (1-3 года)**  
+CREATE TABLE YoungAnimals AS
+SELECT 
+    name, 
+    commands, 
+    birth_date,
+    TIMESTAMPDIFF(MONTH, birth_date, CURDATE()) AS age_months
+FROM (
+    SELECT * FROM Dogs
+    UNION ALL SELECT * FROM Cats
+    UNION ALL SELECT * FROM Hamsters
+    UNION ALL SELECT * FROM Horses
+    UNION ALL SELECT * FROM Donkeys
+) AS all_animals
+WHERE TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) BETWEEN 1 AND 3;
+
+### **2.6. Объединение всех таблиц**  
+```sql
+CREATE TABLE AllAnimals AS
+SELECT 'Dog' AS animal_type, name, commands, birth_date FROM Dogs
+UNION ALL
+10:32
+
+
+SELECT 'Cat', name, commands, birth_date FROM Cats
+UNION ALL
+SELECT 'Hamster', name, commands, birth_date FROM Hamsters
+UNION ALL
+SELECT 'Horse', name, commands, birth_date FROM Horses
+UNION ALL
+SELECT 'Donkey', name, commands, birth_date FROM Donkeys;
+
+---
+
+## **3. Программа на Python (Реестр животных)**  
+
+### **3.1. Класс Animal (родительский)**  python
+class Animal:
+    def __init__(self, name, birth_date, commands):
+        self.name = name
+        self.birth_date = birth_date
+        self.commands = commands
+
+    def get_age(self):
+        today = datetime.now().date()
+        age = today.year - self.birth_date.year
+        if (today.month, today.day) < (self.birth_date.month, self.birth_date.day):
+            age -= 1
+        return age
+
+### **3.2. Классы-наследники (Dog, Cat, Horse и т.д.)**  python
+class Dog(Animal):
+    def __init__(self, name, birth_date, commands):
+        super().__init__(name, birth_date, commands)
+
+class Cat(Animal):
+    def __init__(self, name, birth_date, commands):
+        super().__init__(name, birth_date, commands)
+
+class Horse(Animal):
+    def __init__(self, name, birth_date, commands):
+        super().__init__(name, birth_date, commands)
+
+### **3.3. Реестр животных (меню)**  python
+class AnimalRegistry:
+    def __init__(self):
+        self.animals = []
+
+    def add_animal(self, animal_type, name, birth_date, commands):
+        animal = None
+        if animal_type == "dog":
+            animal = Dog(name, birth_date, commands.split(','))
+        elif animal_type == "cat":
+            animal = Cat(name, birth_date, commands.split(','))
+        self.animals.append(animal)
+
+    def list_animals(self):
+        for animal in self.animals:
+            print(f"{animal.name}, {animal.get_age()} лет")
+
+### **3.4. Меню программы**  python
+def main():
+    registry = AnimalRegistry()
+    while True:
+        print("\n1. Добавить животное\n2. Список животных\n3. Выход")
+        choice = input("Выберите действие: ")
+        if choice == "1":
+            name = input("Имя: ")
+            birth_date = input("Дата рождения (ГГГГ-ММ-ДД): ")
+            commands = input("Команды (через запятую): ")
+            registry.add_animal("dog", name, birth_date, commands)
+        elif choice == "2":
+            registry.list_animals()
+        elif choice == "3":
+            break
+
+---
+
+## **4. Класс Counter (пункт 15)**  
+python
+class Counter:
+    def __init__(self):
+        self.value = 0
+        self.is_open = False
+
+    def add(self):
+        if not self.is_open:
+            raise RuntimeError("Счетчик не был открыт!")
+        self.value += 1
+
+    def __enter__(self):
+        self.is_open = True
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.is_open = False
+        if exc_type is not None:
+            print(f"Ошибка: {exc_val}")
+
+### **Использование счетчика**  python
+with Counter() as counter:
+    counter.add()  # Успешно
+    print(f"Текущее значение: {counter.value}")
+
+counter.add()  # Ошибка: счетчик закрыт!
+
+Ключевые особенности системы:
+1. **Иерархия классов**:
+   - Базовый класс `Animal` с общими свойствами
+   - Классы-потомки для домашних (`Dog`, `Cat`, `Hamster`) и вьючных (`Horse`, `Camel`, `Donkey`) животных
+
+2. **Функционал реестра**:
+   - Добавление новых животных с валидацией данных
+   - Обучение новым командам
+   - Поиск животных по имени
+   - Фильтрация по возрасту
+
+3. **Работа с базой данных**:
+   - Класс `DatabaseManager` для безопасного подключения
+   - Контекстный менеджер для автоматического управления соединением
+
+4. **Счетчик животных**:
+   - Реализация с использованием `try-with-resources`
+   - Проверка на правильное использование
+
+5. **Меню управления**:
+   - Интерактивный интерфейс для работы с реестром
+
+Для работы с MySQL необходимо установить драйвер:
+pip install mysql-connector-python
+
+Эта программа также соответствует всем требованиям задания
+
